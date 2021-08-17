@@ -1,0 +1,4 @@
+# TODO
+
+* plan caching
+* concurrency
