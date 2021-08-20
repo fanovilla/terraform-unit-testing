@@ -2,6 +2,7 @@ package terraform_unit_testing
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/otiai10/copy"
 	"io/ioutil"
 	"log"
@@ -18,9 +19,9 @@ type PlanFixture struct {
 
 // Plan runs a terraform plan.
 // See plan elements in https://www.terraform.io/docs/internals/json-format.html.
-func Plan(t *testing.T) PlanFixture {
+func Plan(t *testing.T, vars map[string]string) PlanFixture {
 
-	dir, err := prepareAndPlan(t)
+	dir, err := prepareAndPlan(t, vars)
 	failTestOnError(t, err)
 	defer os.RemoveAll(dir)
 
@@ -34,7 +35,7 @@ func Plan(t *testing.T) PlanFixture {
 	return PlanFixture{Json: string(planBytes), Plan: planData}
 }
 
-func prepareAndPlan(t *testing.T) (string, error) {
+func prepareAndPlan(t *testing.T, vars map[string]string) (string, error) {
 	dir, err := copyRootModuleForProcessing()
 	failTestOnError(t, err)
 
@@ -44,7 +45,7 @@ func prepareAndPlan(t *testing.T) (string, error) {
 	err = terraformInit(dir)
 	failTestOnError(t, err)
 
-	err = terraformPlan(dir)
+	err = terraformPlan(dir, vars)
 	failTestOnError(t, err)
 
 	err = terraformShow(dir)
@@ -75,8 +76,14 @@ func terraformShow(dir string) error {
 	return err
 }
 
-func terraformPlan(dir string) error {
-	cmd := exec.Command("terraform", "plan", "-out", "tf.plan")
+func terraformPlan(dir string, vars map[string]string) error {
+
+	args := []string{"plan", "-refresh=false", "-out=tf.plan"}
+	for key, val := range vars {
+		args = append(args, "-var", fmt.Sprintf("%s=%s", key, val))
+	}
+	log.Println(fmt.Sprintf("Running terraform %v", args))
+	cmd := exec.Command("terraform", args...)
 
 	cmd.Dir = dir
 	cmd.Stdout = os.Stdout
@@ -115,7 +122,7 @@ func copyTestOverrides(dir string) error {
 // Assumes a directory layout where the test is in a 'tests/<suite_name>/' directory under the root module as
 // described in https://www.terraform.io/docs/language/modules/testing-experiment.html#writing-tests-for-a-module.
 func copyRootModuleForProcessing() (string, error) {
-	dir, err := ioutil.TempDir("../../..", ".tut-")
+	dir, err := ioutil.TempDir("../../..", "tut-")
 	if err != nil {
 		log.Fatal(err)
 	}

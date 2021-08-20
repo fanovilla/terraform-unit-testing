@@ -1,4 +1,4 @@
-package simplesuite
+package basic
 
 import (
 	tut "github.com/fanovilla/terraform-unit-testing"
@@ -7,11 +7,12 @@ import (
 	"testing"
 )
 
-func TestS3(t *testing.T) {
-	plan := tut.Plan(t)
+func TestJmespath(t *testing.T) {
+	plan := tut.Plan(t, nil)
 
 	results, _ := jmespath.Search("resource_changes[?type=='aws_s3_bucket'].change.after.bucket", plan.Plan)
-
 	assert.Len(t, results, 1)
-	assert.ElementsMatch(t, []string{"my-tf-test-bucket"}, results)
+
+	bucketResult, _ := jmespath.Search("[0]", results)
+	assert.Equal(t, "my-tf-test-bucket", bucketResult)
 }
