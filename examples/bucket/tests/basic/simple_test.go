@@ -8,7 +8,7 @@ import (
 )
 
 func TestJmespath(t *testing.T) {
-	plan := tut.Plan(t, nil)
+	plan := tut.Plan(t)
 
 	results, _ := jmespath.Search("resource_changes[?type=='aws_s3_bucket'].change.after.bucket", plan.Plan)
 	assert.Len(t, results, 1)

@@ -8,7 +8,9 @@ import (
 )
 
 func TestS3(t *testing.T) {
-	plan := tut.Plan(t, map[string]string{"bucket_name": "my-tf-test-bucket"})
+	plan := tut.PlanWithConfig(t, tut.PlanFixtureConfig{
+		Vars: map[string]string{"bucket_name": "my-tf-test-bucket"},
+	})
 
 	results, _ := jmespath.Search("resource_changes[?type=='aws_s3_bucket'].change.after.bucket", plan.Plan)
 	assert.Len(t, results, 1)

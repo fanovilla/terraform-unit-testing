@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -17,11 +18,16 @@ type PlanFixture struct {
 	Json string
 }
 
-// Plan runs a terraform plan.
-// See plan elements in https://www.terraform.io/docs/internals/json-format.html.
-func Plan(t *testing.T, vars map[string]string) PlanFixture {
+type PlanFixtureConfig struct {
+	Vars               map[string]string
+	ModuleReplacements map[string]string
+}
 
-	dir, err := prepareAndPlan(t, vars)
+// PlanWithConfig runs a terraform plan.
+// See plan elements in https://www.terraform.io/docs/internals/json-format.html.
+func PlanWithConfig(t *testing.T, config PlanFixtureConfig) PlanFixture {
+
+	dir, err := prepareAndPlan(t, config)
 	failTestOnError(t, err)
 	defer os.RemoveAll(dir)
 
@@ -35,8 +41,15 @@ func Plan(t *testing.T, vars map[string]string) PlanFixture {
 	return PlanFixture{Json: string(planBytes), Plan: planData}
 }
 
-func prepareAndPlan(t *testing.T, vars map[string]string) (string, error) {
+func Plan(t *testing.T) PlanFixture {
+	return PlanWithConfig(t, PlanFixtureConfig{})
+}
+
+func prepareAndPlan(t *testing.T, config PlanFixtureConfig) (string, error) {
 	dir, err := copyRootModuleForProcessing()
+	failTestOnError(t, err)
+
+	err = replaceModuleCalls(dir, config.ModuleReplacements)
 	failTestOnError(t, err)
 
 	err = copyTestOverrides(dir)
@@ -45,7 +58,7 @@ func prepareAndPlan(t *testing.T, vars map[string]string) (string, error) {
 	err = terraformInit(dir)
 	failTestOnError(t, err)
 
-	err = terraformPlan(dir, vars)
+	err = terraformPlan(dir, config.Vars)
 	failTestOnError(t, err)
 
 	err = terraformShow(dir)
@@ -104,12 +117,17 @@ func terraformInit(dir string) error {
 	return err
 }
 
+func replaceModuleCalls(dir string, replacements map[string]string) error {
+	err := filepath.Walk(dir, getWalkFunc(replacements))
+	return err
+}
+
 // Copies .tf files from current test suite folder to the root module for processing.
 // This is useful for overriding provider and data entries to disable remote queries.
 func copyTestOverrides(dir string) error {
 	err := copy.Copy(".", dir, copy.Options{
 		Skip: func(src string) (bool, error) {
-			return !strings.HasSuffix(src, ".tf"), nil
+			return src == ".tut", nil
 		},
 	},
 	)
@@ -129,9 +147,48 @@ func copyRootModuleForProcessing() (string, error) {
 
 	err = copy.Copy("../..", dir, copy.Options{
 		Skip: func(src string) (bool, error) {
-			return strings.HasSuffix(src, "/tests"), nil
+			return strings.HasSuffix(src, "/tests") || strings.HasSuffix(src, ".terraform"), nil
 		},
 	},
 	)
 	return dir, err
+}
+
+func getWalkFunc(replacements map[string]string) filepath.WalkFunc {
+	return func(path string, fi os.FileInfo, err error) error {
+
+		if err != nil {
+			return err
+		}
+
+		if !!fi.IsDir() {
+			return nil //
+		}
+
+		matched, err := filepath.Match("*.tf", fi.Name())
+
+		if err != nil {
+			panic(err)
+			return err
+		}
+
+		if matched {
+			read, err := ioutil.ReadFile(path)
+			if err != nil {
+				panic(err)
+			}
+			log.Printf("Processing module call replacements in %s\n", path)
+
+			newContents := string(read)
+			for old, new := range replacements {
+				newContents = strings.Replace(newContents, old, new, -1)
+			}
+
+			err = ioutil.WriteFile(path, []byte(newContents), 0)
+			if err != nil {
+				panic(err)
+			}
+		}
+		return nil
+	}
 }
