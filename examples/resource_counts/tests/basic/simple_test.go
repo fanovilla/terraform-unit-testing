@@ -1,12 +1,12 @@
 package basic
 
 import (
-	tut "github.com/fanovilla/terraform-unit-testing"
+	"github.com/fanovilla/terraform-unit-testing/tut"
 	"testing"
 )
 
 func TestJmespath(t *testing.T) {
-	plan := tut.Plan(t, nil)
+	plan := tut.Plan(t)
 
 	plan.AssertResourceCounts(t, map[string]int{
 		"aws_iam_group": 1,

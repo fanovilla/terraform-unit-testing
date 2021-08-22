@@ -1,4 +1,4 @@
-package terraform_unit_testing
+package tut
 
 import (
 	"fmt"

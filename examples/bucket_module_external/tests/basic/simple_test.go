@@ -1,7 +1,7 @@
 package basic
 
 import (
-	tut "github.com/fanovilla/terraform-unit-testing"
+	"github.com/fanovilla/terraform-unit-testing/tut"
 	"github.com/jmespath/go-jmespath"
 	"github.com/stretchr/testify/assert"
 	"testing"
