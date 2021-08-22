@@ -15,8 +15,12 @@ type ResourceCount struct {
 	Count    int
 }
 
-func (r *ResourceCount) Equal(s ResourceCount) bool {
+func (r ResourceCount) Equal(s ResourceCount) bool {
 	return r.Resource == s.Resource && r.Count == s.Count
+}
+
+func (r ResourceCount) String() string {
+	return fmt.Sprintf("\"%s\": %d", r.Resource, r.Count)
 }
 
 type ResourceCounts struct {
