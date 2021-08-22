@@ -46,7 +46,14 @@ func Plan(t *testing.T) PlanFixture {
 }
 
 func prepareAndPlan(t *testing.T, config PlanFixtureConfig) (string, error) {
+	testDir, err := os.Getwd()
+	failTestOnError(t, err)
+	err = os.Chdir("../..") // change to root module directory for copying
+	failTestOnError(t, err)
+
 	dir, err := copyRootModuleForProcessing()
+	failTestOnError(t, err)
+	err = os.Chdir(testDir) // change back to test directory
 	failTestOnError(t, err)
 
 	err = replaceModuleCalls(dir, config.ModuleReplacements)
@@ -134,20 +141,22 @@ func copyTestOverrides(dir string) error {
 	return err
 }
 
-// Copies the whole terraform root module to a sibling temp directory
-// so any relative module references outside the root module directory is resolved as is.
+// Copies the whole terraform root module to a directory in os tempdir - used as a base for processing.
 // See https://www.terraform.io/docs/language/modules/index.html#the-root-module
 // Assumes a directory layout where the test is in a 'tests/<suite_name>/' directory under the root module as
 // described in https://www.terraform.io/docs/language/modules/testing-experiment.html#writing-tests-for-a-module.
 func copyRootModuleForProcessing() (string, error) {
-	dir, err := ioutil.TempDir("../../..", "tut-")
+	dir, err := ioutil.TempDir("", "tut-")
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	err = copy.Copy("../..", dir, copy.Options{
+	err = copy.Copy("./", dir, copy.Options{ // assume already in terraform root module dir or copying
 		Skip: func(src string) (bool, error) {
 			return strings.HasSuffix(src, "/tests") || strings.HasSuffix(src, ".terraform"), nil
+		},
+		OnSymlink: func(src string) copy.SymlinkAction {
+			return copy.Deep
 		},
 	},
 	)
